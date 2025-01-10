@@ -1,0 +1,55 @@
+{
+    "name": "efp",
+    "model": {
+        "components": {
+            "ef": {
+                "input": ["input_res"],
+                "output": ["output_req"],
+                "components": {
+                    "g": {
+                        "output": ["output_req"]
+                    },
+                    "t": {
+                        "input": ["input_req", "input_res"]
+                    }
+                },
+                "couplings": [
+                    {
+                        "port_from": "input_res",
+                        "component_to": "t",
+                        "port_to": "input_res"
+                    },
+                    {
+                        "component_from": "g",
+                        "port_from": "output_req",
+                        "component_to": "t",
+                        "port_to": "input_req"
+                    },
+                    {
+                        "component_from": "g",
+                        "port_from": "output_req",
+                        "port_to": "output_req"
+                    }
+                ]
+            },
+            "p": {
+                "input": ["input_req"],
+                "output": ["output_res"]
+            }
+        },
+        "couplings": [
+            {
+                "component_from": "ef",
+                "port_from": "output_req",
+                "component_to": "p",
+                "port_to": "input_req"
+            },
+            {
+                "component_from": "p",
+                "port_from": "output_res",
+                "component_to": "ef",
+                "port_to": "input_res"
+            }
+        ]
+    }
+}

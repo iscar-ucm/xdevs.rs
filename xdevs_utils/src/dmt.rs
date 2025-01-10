@@ -1,12 +1,54 @@
-use std::collections::{HashMap, HashSet};
-use std::hash::{Hash, Hasher};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::{Deref, DerefMut},
+};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Node {
-    pub component: Option<String>,
-    pub port: String,
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Node(pub Option<String>, pub String);
+
+impl Node {
+    pub fn component(&self) -> Option<&String> {
+        self.0.as_ref()
+    }
+
+    pub fn port(&self) -> &String {
+        &self.1
+    }
 }
 
+#[derive(Debug, Default)]
+pub struct CouplingMap(HashMap<Node, HashSet<Node>>);
+
+impl CouplingMap {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+
+    pub fn insert(&mut self, from: Node, to: Node) {
+        self.0.entry(from).or_default().insert(to);
+    }
+
+    pub fn get(&self, from: &Node) -> Option<&HashSet<Node>> {
+        self.0.get(from)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&Node, &HashSet<Node>)> {
+        self.0.iter()
+    }
+
+    pub fn reverse(&self) -> CouplingMap {
+        let mut map = CouplingMap::new();
+        for (from, tos) in &self.0 {
+            for to in tos {
+                map.insert(to.clone(), from.clone());
+            }
+        }
+        map
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum CouplingType {
     EIC,
     IC,
@@ -14,125 +56,61 @@ pub enum CouplingType {
     Invalid,
 }
 
+#[derive(Debug)]
+pub enum CouplingError {
+    NoComponents,
+    InvalidPort,
+    InvalidComponent,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct Coupling {
-    src: Node,
-    dst: Node,
+    component_from: Option<String>,
+    port_from: String,
+    component_to: Option<String>,
+    port_to: String,
 }
 
 impl Coupling {
-    pub fn eic<R: Into<String>, S: Into<String>, T: Into<String>>(
-        port_from: R,
-        component_to: S,
-        port_to: T,
-    ) -> Self {
-        Self {
-            src: Node {
-                component: None,
-                port: port_from.into(),
-            },
-            dst: Node {
-                component: Some(component_to.into()),
-                port: port_to.into(),
-            },
-        }
-    }
-
-    pub fn ic<Q: Into<String>, R: Into<String>, S: Into<String>, T: Into<String>>(
-        component_from: Q,
-        port_from: R,
-        component_to: S,
-        port_to: T,
-    ) -> Self {
-        Self {
-            src: Node {
-                component: Some(component_from.into()),
-                port: port_from.into(),
-            },
-            dst: Node {
-                component: Some(component_to.into()),
-                port: port_to.into(),
-            },
-        }
-    }
-
-    pub fn eoc<Q: Into<String>, R: Into<String>, S: Into<String>>(
-        component_from: Q,
-        port_from: R,
-        port_to: S,
-    ) -> Self {
-        Self {
-            src: Node {
-                component: Some(component_from.into()),
-                port: port_from.into(),
-            },
-            dst: Node {
-                component: None,
-                port: port_to.into(),
-            },
-        }
-    }
-
     fn get_type(&self) -> CouplingType {
-        if self.src.component.is_none() && self.dst.component.is_some() {
+        if self.component_from.is_none() && self.component_to.is_some() {
             CouplingType::EIC
-        } else if self.src.component.is_some() && self.dst.component.is_some() {
+        } else if self.component_from.is_some() && self.component_to.is_some() {
             CouplingType::IC
-        } else if self.src.component.is_some() && self.dst.component.is_none() {
+        } else if self.component_from.is_some() && self.component_to.is_none() {
             CouplingType::EOC
         } else {
             CouplingType::Invalid
         }
     }
+
+    fn nodes(&self) -> (Node, Node) {
+        (
+            Node(self.component_from.clone(), self.port_from.clone()),
+            Node(self.component_to.clone(), self.port_to.clone()),
+        )
+    }
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
-pub struct Components {
-    pub components: HashMap<String, DevsModel>,
-    pub couplings: HashMap<Node, HashSet<Node>>,
+#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq, Eq)]
+pub struct Component {
+    #[serde(default)]
+    input: HashSet<String>,
+    #[serde(default)]
+    output: HashSet<String>,
+    #[serde(default)]
+    components: HashMap<String, Component>,
+    #[serde(default)]
+    couplings: HashSet<Coupling>,
 }
 
-impl Components {
+impl Component {
     pub fn new() -> Self {
         Self {
-            components: HashMap::new(),
-            couplings: HashMap::new(),
-        }
-    }
-
-    fn add_component(&mut self, component: DevsModel) -> Option<DevsModel> {
-        self.components.insert(component.name.clone(), component)
-    }
-}
-
-#[derive(Debug)]
-pub struct DevsModel {
-    pub name: String,
-    pub input: HashSet<String>,
-    pub output: HashSet<String>,
-    pub components: Option<Components>,
-}
-
-impl PartialEq for DevsModel {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-    }
-}
-
-impl Eq for DevsModel {}
-
-impl Hash for DevsModel {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.name.hash(state);
-    }
-}
-
-impl DevsModel {
-    pub fn new<S: Into<String>>(name: S) -> Self {
-        Self {
-            name: name.into(),
             input: HashSet::new(),
             output: HashSet::new(),
-            components: None,
+            components: HashMap::new(),
+            couplings: HashSet::new(),
         }
     }
 
@@ -152,40 +130,35 @@ impl DevsModel {
         self.output.contains(output)
     }
 
-    pub fn add_component(&mut self, component: DevsModel) -> Option<DevsModel> {
-        if self.components.is_none() {
-            self.components = Some(Components::new());
-        }
-        self.components.as_mut().unwrap().add_component(component)
+    pub fn add_component<S: Into<String>>(
+        &mut self,
+        name: S,
+        component: Component,
+    ) -> Option<Component> {
+        self.components.insert(name.into(), component)
     }
 
-    pub fn get_component(&self, name: &str) -> Option<&DevsModel> {
-        self.components
-            .as_ref()
-            .and_then(|c| c.components.get(name))
+    pub fn components(&self) -> &HashMap<String, Component> {
+        &self.components
+    }
+
+    pub fn get_component(&self, name: &str) -> Option<&Component> {
+        self.components.get(name)
     }
 
     pub fn add_coupling(&mut self, coupling: Coupling) -> Result<bool, CouplingError> {
-        if self.components.is_none() {
+        if !self.is_coupled() {
             return Err(CouplingError::NoComponents);
         }
         match coupling.get_type() {
             CouplingType::EIC => {
-                if !self.has_input(&coupling.src.port) {
+                if !self.has_input(&coupling.port_from) {
                     return Err(CouplingError::InvalidPort);
                 }
-                match self.get_component(coupling.dst.component.as_ref().unwrap()) {
+                match self.get_component(coupling.component_to.as_ref().unwrap()) {
                     Some(component) => {
-                        if component.has_input(&coupling.dst.port) {
-                            let res = self
-                                .components
-                                .as_mut()
-                                .unwrap()
-                                .couplings
-                                .entry(coupling.src)
-                                .or_default()
-                                .insert(coupling.dst);
-                            Ok(res)
+                        if component.has_input(&coupling.port_to) {
+                            Ok(self.couplings.insert(coupling))
                         } else {
                             Err(CouplingError::InvalidPort)
                         }
@@ -195,20 +168,12 @@ impl DevsModel {
             }
             CouplingType::IC => {
                 match (
-                    self.get_component(coupling.src.component.as_ref().unwrap()),
-                    self.get_component(coupling.dst.component.as_ref().unwrap()),
+                    self.get_component(coupling.component_from.as_ref().unwrap()),
+                    self.get_component(coupling.component_to.as_ref().unwrap()),
                 ) {
                     (Some(src), Some(dst)) => {
-                        if src.has_output(&coupling.src.port) && dst.has_input(&coupling.dst.port) {
-                            let res = self
-                                .components
-                                .as_mut()
-                                .unwrap()
-                                .couplings
-                                .entry(coupling.src)
-                                .or_default()
-                                .insert(coupling.dst);
-                            Ok(res)
+                        if src.has_output(&coupling.port_from) && dst.has_input(&coupling.port_to) {
+                            Ok(self.couplings.insert(coupling))
                         } else {
                             Err(CouplingError::InvalidPort)
                         }
@@ -217,18 +182,10 @@ impl DevsModel {
                 }
             }
             CouplingType::EOC => {
-                match self.get_component(coupling.src.component.as_ref().unwrap()) {
+                match self.get_component(coupling.component_from.as_ref().unwrap()) {
                     Some(component) => {
-                        if component.has_output(&coupling.src.port) {
-                            let res = self
-                                .components
-                                .as_mut()
-                                .unwrap()
-                                .couplings
-                                .entry(coupling.src)
-                                .or_default()
-                                .insert(coupling.dst);
-                            Ok(res)
+                        if component.has_output(&coupling.port_from) {
+                            Ok(self.couplings.insert(coupling))
                         } else {
                             Err(CouplingError::InvalidPort)
                         }
@@ -240,40 +197,88 @@ impl DevsModel {
         }
     }
 
+    pub fn get_couplings(&self) -> &HashSet<Coupling> {
+        &self.couplings
+    }
+
+    pub fn coupling_map(&self) -> CouplingMap {
+        let mut map = CouplingMap::new();
+        for coupling in &self.couplings {
+            let (from, to) = coupling.nodes();
+            map.insert(from, to);
+        }
+        map
+    }
+
     pub fn is_coupled(&self) -> bool {
-        self.components.is_some()
+        !self.components.is_empty()
     }
 }
 
-#[derive(Debug)]
-pub enum CouplingError {
-    NoComponents,
-    InvalidPort,
-    InvalidComponent,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DevsModelTree {
+    name: String,
+    model: Component,
+}
+
+impl Deref for DevsModelTree {
+    type Target = Component;
+
+    fn deref(&self) -> &Self::Target {
+        &self.model
+    }
+}
+
+impl DerefMut for DevsModelTree {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.model
+    }
+}
+
+impl DevsModelTree {
+    pub fn new<S: Into<String>>(name: S) -> Self {
+        Self {
+            name: name.into(),
+            model: Component::new(),
+        }
+    }
+    pub fn from_json(json_str: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json_str)
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::{fs, path::Path};
+
     #[test]
     fn efp() {
-        let mut p = DevsModel::new("processor");
+        let mut p = Component::new();
         p.add_input("input_req");
         p.add_output("output_res");
 
-        let mut ef = DevsModel::new("ef");
+        let mut ef = Component::new();
         ef.add_input("input_res");
         ef.add_output("output_req");
 
-        let mut efp = DevsModel::new("efp");
-        assert_eq!(efp.add_component(p), None);
-        assert_eq!(efp.add_component(ef), None);
+        let mut efp = DevsModelTree::new("efp");
+        assert_eq!(efp.add_component("p", p), None);
+        assert_eq!(efp.add_component("ef", ef), None);
+    }
 
-        efp.add_coupling(Coupling::ic("ef", "output_req", "processor", "input_req"))
-            .unwrap();
-        efp.add_coupling(Coupling::ic("processor", "output_res", "ef", "input_res"))
-            .unwrap();
+    #[test]
+    fn json() {
+        let path = Path::new("examples/efp_deep.json");
+        let json_str = fs::read_to_string(path).expect("Failed to read JSON file");
 
-        println!("{:?}", efp);
+        match DevsModelTree::from_json(&json_str) {
+            Ok(devs_model_tree) => {
+                println!("{:#?}", devs_model_tree);
+            }
+            Err(e) => {
+                eprintln!("Failed to parse JSON: {:?}", e);
+            }
+        }
     }
 }

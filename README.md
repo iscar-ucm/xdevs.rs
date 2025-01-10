@@ -7,7 +7,7 @@ Its API is easy to use for DEVS practitioners. Currently, their main features ar
 ## Blazingly fast 🚀
 
 The Rust version of xDEVS is one of the fastests APIs currently available.
-We will shortly publish some preliminary results to illustrate this.
+Check the [references](#references) section for more information.
 
 ## Unsafe but sound 🔐
 
@@ -41,13 +41,14 @@ We provide additional features to select handy combinations of features:
 - `par_all_no_couplings`: alias for `par_start`, `par_collection`, `par_transition`, and `par_stop` (**THIS IS OUR FAVOURITE**).
 - `par_all`: alias for `par_all_no_couplings` and `par_couplings`.
 
-## Real-Time (RT) simulation ready ⏱
+## Real-Time (RT) simulation 🗼
 
 You can run your simulations in real-time!
+We rely on the [`tokio`](https://tokio.rs) crate to provide an asynchronous RT simulator.
 This feature is specially useful for Hardware-in-the-Loop (HIL) simulation, Digital Twins (DTs),
 and hybrid environments where simulation and real hardware coexist.
 
-## References 📖
+## References
 
 1. R. Cárdenas, P. Arroba, and J. L. Risco-Martín, "[Lock-Free Simulation Algorithm to Enhance the Performance of Sequential and Parallel DEVS Simulators in Shared-Memory Architectures](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5035228)," 2024 (PREPRINT).
 2. R. Cárdenas, P. Arroba and J. L. Risco-Martín, "[A New Family of XDEVS Simulators for Enhanced Performance](https://ieeexplore.ieee.org/document/10155396)," 2023 Annual Modeling and Simulation Conference (ANNSIM), Hamilton, ON, Canada, 2023, pp. 668-679.

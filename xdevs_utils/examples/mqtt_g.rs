@@ -1,5 +1,5 @@
 use xdevs::{
-    gpt::ExperimentalFrame,
+    gpt::Generator,
     simulation::rt::{RootCoordinator, RootCoordinatorConfig},
 };
 use xdevs_utils::mqtt::MqttHandler;
@@ -12,13 +12,13 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     // First, let's create the DEVS model
-    let model_name = "ef";
+    let model_name = "g";
     let req_period = 3.;
-    let obst_time = 50.;
-    let ef = ExperimentalFrame::new(model_name, req_period, obst_time);
+    let obst_time = 1000.;
+    let generator = Generator::new(model_name, req_period);
 
     // Next, we will create the MQTT handler for the DEVS model
-    let mqtt_root = "xdevs/efp";
+    let mqtt_root = "xdevs/efp/components/ef";
     let mqtt_host = "0.0.0.0";
     let mqtt_port = 1883;
     let mqtt_handler = MqttHandler::new(
@@ -40,7 +40,7 @@ async fn main() {
         Some(queue_size),
         window,
     );
-    let mut simulator = RootCoordinator::new(ef, config);
+    let mut simulator = RootCoordinator::new(generator, config);
 
     // We spawn the MQTT handler and the simulation
     let mut handles = simulator.spawn_handler(mqtt_handler);

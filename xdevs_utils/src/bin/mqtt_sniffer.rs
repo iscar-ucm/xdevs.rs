@@ -1,3 +1,16 @@
+//! MQTT sniffer that listens to all messages on a given MQTT broker and prints them to the console.
+//!
+//! # Usage
+//!
+//! ```sh
+//! cargo run --bin mqtt_sniffer <client_id> <host> <port> <root_topic>
+//! ```
+//!
+//! - `client_id`: MQTT client ID. Default is `mqtt_sniffer`.
+//! - `host`: MQTT broker host. Default is `localhost`.
+//! - `port`: MQTT broker port. Default is `1883`.
+//! - `root_topic`: MQTT root topic to listen to. Default is `xdevs`.
+
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS};
 use std::time::Duration;
 

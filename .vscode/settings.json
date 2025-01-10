@@ -6,6 +6,7 @@
     "rust-analyzer.cargo.features": [
         "par_all",
         "rt",
+        "dmt",
         "mqtt",
     ],
 }

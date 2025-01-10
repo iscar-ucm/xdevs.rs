@@ -1,0 +1,29 @@
+{
+    "name": "efp",
+    "model": {
+        "components": {
+            "ef": {
+                "input": ["input_res"],
+                "output": ["output_req"]
+            },
+            "p": {
+                "input": ["input_req"],
+                "output": ["output_res"]
+            }
+        },
+        "couplings": [
+            {
+                "component_from": "ef",
+                "port_from": "output_req",
+                "component_to": "p",
+                "port_to": "input_req"
+            },
+            {
+                "component_from": "p",
+                "port_from": "output_res",
+                "component_to": "ef",
+                "port_to": "input_res"
+            }
+        ]
+    }
+}

@@ -14,7 +14,7 @@ async fn main() {
     // First, let's create the DEVS model
     let model_name = "p";
     let proc_time = 1.;
-    let obst_time = 50.;
+    let obst_time = 1000.;
     let processor = Processor::new(model_name, proc_time);
 
     // Next, we will create the MQTT handler for the DEVS model

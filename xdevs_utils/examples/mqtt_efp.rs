@@ -1,7 +1,5 @@
-use xdevs_utils::{
-    dmt::{Coupling, DevsModel},
-    mqtt::MqttCoupled,
-};
+use std::{fs, path::Path};
+use xdevs_utils::{dmt::DevsModelTree, mqtt::DmtPropagator};
 
 #[tokio::main]
 async fn main() {
@@ -10,26 +8,16 @@ async fn main() {
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    // First, let's create the DEVS Model Tree (DMT) to describe the structure of the EFP model
-    let mut p = DevsModel::new("p");
-    p.add_input("input_req");
-    p.add_output("output_res");
-    let mut ef = DevsModel::new("ef");
-    ef.add_input("input_res");
-    ef.add_output("output_req");
-    let mut efp = DevsModel::new("efp");
-    efp.add_component(p);
-    efp.add_component(ef);
-    efp.add_coupling(Coupling::ic("ef", "output_req", "p", "input_req"))
-        .unwrap();
-    efp.add_coupling(Coupling::ic("p", "output_res", "ef", "input_res"))
-        .unwrap();
+    // First, let's parse the DEVS Model Tree (DMT) that describe the structure of the EFP model
+    let path = Path::new("xdevs_utils/examples/efp_deep.json");
+    let json_str = fs::read_to_string(path).expect("Failed to read JSON file");
+    let dmt = DevsModelTree::from_json(&json_str).expect("Failed to parse JSON file");
 
     // Next, we will create the MQTT client that propagates events through the DEVS model
     let mqtt_root = "xdevs/efp";
     let mqtt_host = "0.0.0.0";
     let mqtt_port = 1883;
-    let coupled = MqttCoupled::new(mqtt_root, "efp", mqtt_host, mqtt_port, efp);
+    let coupled = DmtPropagator::new(mqtt_root, "efp", mqtt_host, mqtt_port, dmt);
 
     for handle in coupled.spawn() {
         handle.await.unwrap();
