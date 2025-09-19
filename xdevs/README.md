@@ -1,3 +1,6 @@
+[![crates.io](https://img.shields.io/crates/d/xdevs.svg)](https://crates.io/crates/xdevs)
+[![crates.io](https://img.shields.io/crates/v/xdevs.svg)](https://crates.io/crates/xdevs)
+
 # `xDEVS.rs`
 
 Version of the xDEVS simulator for Rust projects.
@@ -50,5 +53,6 @@ and hybrid environments where simulation and real hardware coexist.
 
 ## References
 
-1. R. Cárdenas, P. Arroba, and J. L. Risco-Martín, "[Lock-Free Simulation Algorithm to Enhance the Performance of Sequential and Parallel DEVS Simulators in Shared-Memory Architectures](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5035228)," 2024 (PREPRINT).
-2. R. Cárdenas, P. Arroba and J. L. Risco-Martín, "[A New Family of XDEVS Simulators for Enhanced Performance](https://ieeexplore.ieee.org/document/10155396)," 2023 Annual Modeling and Simulation Conference (ANNSIM), Hamilton, ON, Canada, 2023, pp. 668-679.
+1. R. Cárdenas, P. Arroba, and J. L. Risco-Martín, "[Lock-Free Simulation Algorithm to Enhance the Performance of Sequential and Parallel DEVS Simulators in Shared-Memory Architectures](https://doi.org/10.1016/j.jpdc.2025.105105)," Journal of Parallel and Distributed Computing (203) pp. 105105, 2025.
+2. R. Cárdenas, P. Arroba, S. Esteban and J. L. Risco-Martín, "[DEVS over MQTT to Enable Distributed Real-Time Simulation](https://ieeexplore.ieee.org/abstract/document/11118639)," 2025 Annual Modeling and Simulation Conference (ANNSIM), Madrid, Spain, 2025, pp. 1-13.
+3. R. Cárdenas, P. Arroba and J. L. Risco-Martín, "[A New Family of XDEVS Simulators for Enhanced Performance](https://ieeexplore.ieee.org/document/10155396)," 2023 Annual Modeling and Simulation Conference (ANNSIM), Hamilton, ON, Canada, 2023, pp. 668-679.

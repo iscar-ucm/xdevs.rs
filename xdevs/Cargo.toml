@@ -1,6 +1,6 @@
 [package]
 name = "xdevs"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Román Cárdenas <rcardenas.rod@gmail.com>"]
 edition = "2021"
 description = "An open source DEVS M&S framework."
