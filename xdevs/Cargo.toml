@@ -35,3 +35,7 @@ rt = ["tokio", "tracing"]
 
 [package.metadata.docs.rs]
 features = ["par_all", "rt"]
+
+[[example]]
+name = "gpt_efp_rt"
+required-features = ["rt"]
