@@ -25,7 +25,7 @@ pub(crate) trait Port: DynRef {
     /// This method must only be executed by the [`super::Component`] when clearing its ports.
     unsafe fn clear(&self);
 
-    /// Returns `true` if other port is compatible.
+    /// Returns `true` if other port is type-compatible.
     fn is_compatible(&self, other: &dyn Port) -> bool;
 
     /// Propagates messages from the port to other receiving port.
@@ -36,8 +36,15 @@ pub(crate) trait Port: DynRef {
     /// messages in its [`crate::simulation::Simulator`] trait implementation.
     unsafe fn propagate(&self, port_to: &dyn Port);
 
+    /// Adds a new value to the port.
+    ///
+    /// The value is provided as a string and must be parsed to the port's type.
+    /// If parsing fails, it returns an error. Otherwise, it returns `Ok(())`.
+    #[cfg(feature = "rt")]
     unsafe fn inject(&self, value: &str) -> Result<(), ()>;
 
+    /// Returns a vector of string representations of the values in the port.
+    #[cfg(feature = "rt")]
     unsafe fn eject(&self) -> Vec<String>;
 }
 
@@ -56,7 +63,8 @@ impl<T> Bag<T> {
     ///
     /// # Safety:
     ///
-    /// The caller must ensure that it fulfills **any** the following invariants:
+    /// The caller must ensure that it fulfills **any** of the following invariants:
+    ///
     /// - The caller is an [`InPort`] struct and fulfills the aditional invariants.
     /// - The caller executed the [`Port::propagate`] method and fulfills the additional invariants.
     #[inline]
@@ -68,7 +76,8 @@ impl<T> Bag<T> {
     ///
     /// # Safety:
     ///
-    /// The caller must ensure that it fulfills **any** the following invariants:
+    /// The caller must ensure that it fulfills **any** of the following invariants:
+    ///
     /// - The caller is an [`OutPort`] struct and fulfills the aditional invariants.
     /// - The caller executed the [`Port::propagate`] method and fulfills the additional invariants.
     #[allow(clippy::mut_from_ref)]
@@ -121,6 +130,7 @@ impl<T: PortVal> Port for Bag<T> {
     }
 
     #[inline]
+    #[cfg(feature = "rt")]
     unsafe fn inject(&self, value: &str) -> Result<(), ()> {
         match value.parse() {
             Ok(value) => {
@@ -132,22 +142,24 @@ impl<T: PortVal> Port for Bag<T> {
     }
 
     #[inline]
+    #[cfg(feature = "rt")]
     unsafe fn eject(&self) -> Vec<String> {
         self.borrow_mut().iter().map(|v| v.to_string()).collect()
     }
 }
 
 /// Input port. This structure only allows reading messages. Thus, it cannot inject messages.
+///
 /// Note that we do not implement the [`Clone`] trait in purpose, as we want to avoid their misuse.
 #[derive(Debug)]
 pub struct InPort<T>(pub(super) Arc<Bag<T>>);
 
-impl<T: Clone> InPort<T> {
+impl<T> InPort<T> {
     /// Returns `true` if the underlying bag is empty. Otherwise, it returns `false`.
     ///
     /// # Safety
     ///
-    /// This method can only be called when implementing the [`super::Atomic::delta_ext`] method.
+    /// This method can only be called within the [`Atomic::delta_ext`](super::Atomic::delta_ext) method.
     /// Furthermore, this port must be one of the input ports of the implementer.
     #[inline]
     pub unsafe fn is_empty(&self) -> bool {
@@ -166,17 +178,18 @@ impl<T: Clone> InPort<T> {
     }
 }
 
-/// Output port. This structure only injecting messages. Thus, it cannot read messages.
+/// Output port. This structure can only inject messages. Thus, it cannot read messages.
+///
 /// Note that we do not implement the [`Clone`] trait in purpose, as we want to avoid their misuse.
 #[derive(Debug)]
-pub struct OutPort<T: Clone>(pub(super) Arc<Bag<T>>);
+pub struct OutPort<T>(pub(super) Arc<Bag<T>>);
 
-impl<T: Clone> OutPort<T> {
+impl<T> OutPort<T> {
     /// Adds a new value to the output port.
     ///
     /// # Safety
     ///
-    /// This method can only be called when implementing the [`super::Atomic::lambda`] method.
+    /// This method can only be called when implementing the [`Atomic::lambda`](super::Atomic::lambda) method.
     /// Furthermore, this port must be one of the output ports of the implementer.
     #[inline]
     pub unsafe fn add_value(&self, value: T) {
@@ -187,10 +200,13 @@ impl<T: Clone> OutPort<T> {
     ///
     /// # Safety
     ///
-    /// This method can only be called when implementing the [`super::Atomic::lambda`] method.
+    /// This method can only be called when implementing the [`Atomic::lambda`](super::Atomic::lambda) method.
     /// Furthermore, this port must be one of the output ports of the implementer.
     #[inline]
-    pub unsafe fn add_values(&self, values: &[T]) {
+    pub unsafe fn add_values(&self, values: &[T])
+    where
+        T: Clone,
+    {
         self.0.borrow_mut().extend_from_slice(values);
     }
 }

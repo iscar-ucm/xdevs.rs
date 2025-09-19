@@ -27,12 +27,13 @@ impl Event {
     }
 
     /// Returns the name of the port of the `Event`.
-    /// #[inline]
+    #[inline]
     pub fn port(&self) -> &str {
         &self.0
     }
 
     /// Returns the a string representation of the value of the `Event`.
+    #[inline]
     pub fn value(&self) -> &str {
         &self.1
     }

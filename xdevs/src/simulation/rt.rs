@@ -4,16 +4,40 @@ use std::time::{Duration, SystemTime};
 pub mod input;
 pub mod output;
 
+/// Configuration for the Real-Time Root Coordinator.
 #[derive(Debug, Clone, Copy)]
 pub struct RootCoordinatorConfig {
+    /// Time scale factor for the simulation.
+    ///
+    /// A value of 1.0 means real-time, values greater than 1.0 speed up
+    /// the simulation, and values less than 1.0 slow it down.
     pub time_scale: f64,
+
+    /// Maximum allowable jitter for the simulation.
+    ///
+    /// If the jitter exceeds this value, the simulation will panic.
+    /// A value of `None` means no jitter check.
     pub max_jitter: Option<Duration>,
+
+    /// Capacity of the output event queue.
+    ///
+    /// A value of `None` means no output queue.
     pub output_capacity: Option<usize>,
+
+    /// Buffer size of the input event queue.
+    ///
+    /// A value of `None` means no input queue.
     pub input_buffer: Option<usize>,
+
+    /// Optional time window for batching input events.
+    ///
+    /// A value of `None` means no batching.
     pub input_window: Option<Duration>,
 }
 
 impl RootCoordinatorConfig {
+    /// Creates a new `RootCoordinatorConfig` with the specified parameters.
+    #[inline]
     pub fn new(
         time_scale: f64,
         max_jitter: Option<Duration>,
@@ -43,16 +67,24 @@ impl Default for RootCoordinatorConfig {
     }
 }
 
+/// Real-Time Root Coordinator for managing the simulation of a DEVS model in real-time.
 #[derive(Debug)]
 pub struct RootCoordinator<T> {
+    /// The DEVS model being simulated.
     model: T,
+    /// Time scale factor for the simulation.
     time_scale: f64,
+    /// Maximum allowable jitter for the simulation.
     max_jitter: Option<Duration>,
+    /// Output event queue. `None` if no output queue is configured.
     output_queue: Option<output::OutputQueue>,
+    /// Input event queue. `None` if no input queue is configured.
     input_queue: Option<input::InputQueue>,
 }
 
 impl<T: Simulator> RootCoordinator<T> {
+    /// Creates a new `RootCoordinator` with the provided DEVS model and configuration.
+    #[inline]
     pub fn new(model: T, config: RootCoordinatorConfig) -> Self {
         let output_queue = config.output_capacity.map(output::OutputQueue::new);
         let input_queue = config
@@ -67,6 +99,11 @@ impl<T: Simulator> RootCoordinator<T> {
         }
     }
 
+    /// Spawns a handler for managing input and output events.
+    ///
+    /// It returns a vector of `JoinHandle`s for the spawned tasks. It is the caller's
+    /// responsibility to manage the lifecycle of these tasks.
+    #[inline]
     pub fn spawn_handler<H: Handler>(&mut self, handler: H) -> Vec<tokio::task::JoinHandle<()>> {
         let input_tx = self
             .input_queue
@@ -76,10 +113,12 @@ impl<T: Simulator> RootCoordinator<T> {
             .output_queue
             .as_ref()
             .map(|output_handler| output_handler.subscribe());
-        // Safety: using run from the RootCoordinator::run_handler method
-        Handler::spawn(handler, input_tx, output_rx)
+        // Safety: spawning from the spawn_handler method
+        unsafe { Handler::spawn(handler, input_tx, output_rx) }
     }
 
+    /// Runs the Real-Time simulation until the specified stop time.
+    #[inline]
     pub async fn simulate(mut self, t_stop: f64) {
         tracing::info!("starting simulation");
 
@@ -102,6 +141,12 @@ impl<T: Simulator> RootCoordinator<T> {
             match &mut self.input_queue {
                 Some(input_handler) => input_handler.wait_event(next_rt, &self.model).await,
                 None => {
+                    let duration = match next_rt {
+                        Some(t_next) => {
+                            t_next.duration_since(SystemTime::now()).unwrap_or_default()
+                        }
+                        None => Duration::MAX,
+                    };
                     tracing::debug!("sleeping for {duration:?}");
                     tokio::time::sleep(duration).await
                 }
@@ -154,11 +199,12 @@ impl<T: Simulator> RootCoordinator<T> {
 }
 
 pub trait Handler {
+    /// Spawns a handler for managing input and output events.
     ///
     /// # Safety
     ///
     /// Do not call this method directly. Use [`RootCoordinator::spawn_handler`] instead.
-    fn spawn(
+    unsafe fn spawn(
         self,
         input_tx: Option<input::InputSender>,
         output_rx: Option<output::OutputReceiver>,

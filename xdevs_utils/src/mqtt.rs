@@ -34,7 +34,7 @@ impl MqttHandler {
 }
 
 impl Handler for MqttHandler {
-    fn spawn(
+    unsafe fn spawn(
         self,
         input_tx: Option<InputSender>,
         output_rx: Option<OutputReceiver>,
@@ -123,7 +123,7 @@ async fn eventloop_thread(mut eventloop: EventLoop, input_tx: Option<InputSender
                 tracing::debug!("MQTT event notification: {notif:?}");
                 if let Some(input_tx) = &input_tx {
                     if let rumqttc::Event::Incoming(Packet::Publish(packet)) = notif {
-                        let port = packet.topic.split('/').last().unwrap().to_string();
+                        let port = packet.topic.split('/').next_back().unwrap().to_string();
 
                         let value = match String::from_utf8(packet.payload.to_vec()) {
                             Ok(string) => string,
@@ -159,7 +159,7 @@ pub use dmt::DmtPropagator;
 mod dmt {
     use super::MqttHandler;
     use crate::dmt::{Component, DevsModelTree};
-    use rumqttc::{AsyncClient, EventLoop, Packet, Publish, QoS, SubscribeFilter};
+    use rumqttc::{AsyncClient, EventLoop, Packet, Publish, QoS};
     use std::{
         collections::{HashMap, HashSet},
         ops::{Deref, DerefMut},
