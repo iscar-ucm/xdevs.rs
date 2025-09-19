@@ -1,8 +1,13 @@
-use crate::modeling::{Atomic, Component, Coupled};
-use crate::DynRef;
+use crate::{
+    modeling::{Atomic, Component, Coupled},
+    DynRef,
+};
 #[cfg(feature = "par_any")]
 use rayon::prelude::*;
 use std::ops::{Deref, DerefMut};
+
+#[cfg(feature = "rt")]
+pub mod rt;
 
 /// Interface for simulating DEVS models. All DEVS models must implement this trait.
 pub trait Simulator: DynRef {
@@ -36,12 +41,14 @@ pub trait Simulator: DynRef {
         self.get_component_mut().set_sim_t(t_last, t_next);
     }
 
+    /// Clears input messages from the inner DEVS [`Component`]s.
     #[inline]
     fn clear_input(&mut self) {
         // Safety: simulator clearing its input
         unsafe { self.get_component_mut().clear_input() };
     }
 
+    /// Clears output messages from the inner DEVS [`Component`]s.
     #[inline]
     fn clear_output(&mut self) {
         // Safety: simulator clearing its output
@@ -83,6 +90,7 @@ impl<T: Atomic + DynRef> Simulator for T {
         Atomic::get_component_mut(self)
     }
 
+    #[inline]
     fn start(&mut self, t_start: f64) -> f64 {
         Atomic::start(self);
         let t_next = t_start + self.ta();
@@ -90,17 +98,20 @@ impl<T: Atomic + DynRef> Simulator for T {
         t_next
     }
 
+    #[inline]
     fn stop(&mut self, t_stop: f64) {
         self.set_sim_t(t_stop, f64::INFINITY);
         Atomic::stop(self);
     }
 
+    #[inline]
     fn collection(&mut self, t: f64) {
         if t >= self.get_t_next() {
             Atomic::lambda(self)
         }
     }
 
+    #[inline]
     fn transition(&mut self, t: f64) -> f64 {
         let t_next = self.get_t_next();
         // Safety: simulator executing its transition function
@@ -140,6 +151,10 @@ impl Simulator for Coupled {
     /// method and obtain the next simulation time.
     ///
     /// If the feature `par_start` is activated, the iteration is parallelized.
+    ///
+    /// If the feature `par_couplings` is activated, the EICs, EOCs, and ICs are built
+    /// for enabling parallel event propagation.
+    #[inline]
     fn start(&mut self, t_start: f64) -> f64 {
         #[cfg(feature = "par_start")]
         let iter = self.components.par_iter_mut();
@@ -167,6 +182,7 @@ impl Simulator for Coupled {
     /// method and obtain the next simulation time.
     ///
     /// If the feature `par_stop` is activated, the iteration is parallelized.
+    #[inline]
     fn stop(&mut self, t_stop: f64) {
         #[cfg(feature = "par_stop")]
         let iter = self.components.par_iter_mut();
@@ -178,10 +194,11 @@ impl Simulator for Coupled {
     }
 
     /// Iterates over all the subcomponents to call their [`Simulator::collection`] method.
-    /// If the feature `par_collection` is activated, the iteration is parallelized.
-    /// Then, it iterates over all the EOCs and propagates messages accordingly.
+    /// Then, it iterates over all the EOCs and ICs and propagates messages accordingly.
     ///
-    /// If the feature `par_eoc` is activated, the iteration is parallelized.
+    /// If the feature `par_collection` is activated, the iteration over subcomponents is parallelized.
+    /// If the feature `par_couplings` is activated, the iteration is over couplings is parallelized.
+    #[inline]
     fn collection(&mut self, t: f64) {
         if t >= self.get_t_next() {
             #[cfg(feature = "par_collection")]
@@ -212,14 +229,15 @@ impl Simulator for Coupled {
         }
     }
 
-    /// Iterates over all the EICs and ICs and propagates messages accordingly.
-    /// If the feature `par_xic` is activated, the iteration is parallelized.
+    /// Iterates over all the EICs and propagates messages accordingly.
     /// Then, it iterates over all the subcomponents to:
     /// 1. Call their [`Simulator::transition`] method
     /// 2. Clear their ports
-    /// 3. obtain their next simulation time.
+    /// 3. Obtain their next simulation time.
     ///
-    /// If the feature `par_transition` is activated, the iteration is parallelized.
+    /// If the feature `par_couplings` is activated, the iteration over EICs is parallelized.
+    /// If the feature `par_transition` is activated, the iteration over subcomponents is parallelized.
+    #[inline]
     fn transition(&mut self, t: f64) -> f64 {
         // Safety: simulator checking if its input is empty
         let is_external = !unsafe { self.get_component().is_input_empty() };
@@ -259,7 +277,49 @@ impl Simulator for Coupled {
     }
 }
 
+#[macro_export]
+macro_rules! impl_coupled {
+    ($struct_name:ident) => {
+        $crate::impl_coupled!($struct_name, coupled);
+    };
+    ($struct_name:ident, $coupled_name:ident) => {
+        impl $crate::simulation::Simulator for $struct_name {
+            #[inline]
+            fn get_component(&self) -> &$crate::modeling::Component {
+                self.$coupled_name.get_component()
+            }
+            #[inline]
+            fn get_component_mut(&mut self) -> &mut $crate::modeling::Component {
+                self.$coupled_name.get_component_mut()
+            }
+            #[inline]
+            fn start(&mut self, t_start: f64) -> f64 {
+                self.$coupled_name.start(t_start)
+            }
+            #[inline]
+            fn stop(&mut self, t_stop: f64) {
+                self.$coupled_name.stop(t_stop)
+            }
+            #[inline]
+            fn collection(&mut self, t: f64) {
+                self.$coupled_name.collection(t)
+            }
+            #[inline]
+            fn transition(&mut self, t: f64) -> f64 {
+                self.$coupled_name.transition(t)
+            }
+        }
+
+        impl From<$struct_name> for $crate::modeling::Coupled {
+            fn from(coupled: $struct_name) -> Self {
+                coupled.coupled
+            }
+        }
+    };
+}
+
 /// Root coordinator for sequential simulations of DEVS models.
+#[repr(transparent)]
 pub struct RootCoordinator<T>(T);
 
 impl<T: Simulator> RootCoordinator<T> {
@@ -269,9 +329,9 @@ impl<T: Simulator> RootCoordinator<T> {
     }
 
     /// Runs a simulation for a given period of time.
-    pub fn simulate(&mut self, t_end: f64) {
+    pub fn simulate(&mut self, t_stop: f64) {
         let mut t_next = self.start(0.);
-        while t_next < t_end {
+        while t_next < t_stop {
             self.collection(t_next);
             t_next = self.transition(t_next);
         }

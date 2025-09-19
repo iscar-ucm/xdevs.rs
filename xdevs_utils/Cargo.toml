@@ -1,0 +1,53 @@
+[package]
+name = "xdevs_utils"
+version = "0.1.0"
+authors = ["Román Cárdenas <rcardenas.rod@gmail.com>"]
+edition = "2021"
+description = "Utility extensions for the xDEVS simulator."
+readme = "README.md"
+repository = "https://github.com/iscar-ucm/xdevs.rs"
+license = "LGPL-3.0-or-later"
+keywords = ["DEVS", "modeling", "simulation"]
+categories = ["simulation"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rumqttc = { version = "0.25", optional = true}
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true }
+tokio = { version = "1.42", features = ["full"], optional = true }
+tracing = { version = "0.1", optional = true }
+xdevs = { version = "0.4.0", path = "../xdevs" }
+
+[dev-dependencies]
+tracing-subscriber = { version = "0.3" }
+
+[features]
+dmt = ["serde", "serde_json"]
+mqtt = ["xdevs/rt", "rumqttc", "tokio", "tracing"]
+
+[[bin]]
+name = "mqtt_sniffer"
+required-features = ["mqtt"]
+path = "src/bin/mqtt_sniffer.rs"
+
+[[example]]
+name = "mqtt_ef"
+required-features = ["mqtt"]
+
+[[example]]
+name = "mqtt_efp"
+required-features = ["mqtt", "dmt"]
+
+[[example]]
+name = "mqtt_g"
+required-features = ["mqtt", "dmt"]
+
+[[example]]
+name = "mqtt_p"
+required-features = ["mqtt", "dmt"]
+
+[[example]]
+name = "mqtt_t"
+required-features = ["mqtt", "dmt"]

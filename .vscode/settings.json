@@ -4,6 +4,9 @@
         "editor.formatOnSave": true
     },
     "rust-analyzer.cargo.features": [
-        "par_all"
+        "par_all",
+        "rt",
+        "dmt",
+        "mqtt",
     ],
 }

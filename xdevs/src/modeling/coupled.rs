@@ -1,9 +1,11 @@
-use super::port::Port;
-use super::{Component, InPort, OutPort};
-use crate::simulation::Simulator;
-use crate::DynRef;
-use std::collections::HashMap;
-use std::sync::Arc;
+use crate::{
+    modeling::{
+        port::{Port, PortVal},
+        Component, InPort, OutPort,
+    },
+    simulation::Simulator,
+};
+use std::{collections::HashMap, sync::Arc};
 
 pub(crate) type Coupling = (Arc<dyn Port>, Arc<dyn Port>);
 
@@ -78,20 +80,23 @@ impl Coupled {
     }
 
     /// Adds a new input port of type `T` and returns a reference to it.
+    ///
     /// It panics if there is already an input port with the same name.
     #[inline]
-    pub fn add_in_port<T: DynRef + Clone>(&mut self, name: &str) -> InPort<T> {
+    pub fn add_in_port<T: PortVal>(&mut self, name: &str) -> InPort<T> {
         self.component.add_in_port::<T>(name)
     }
 
     /// Adds a new output port of type `T` and returns a reference to it.
+    ///
     /// It panics if there is already an output port with the same name.
     #[inline]
-    pub fn add_out_port<T: DynRef + Clone>(&mut self, name: &str) -> OutPort<T> {
+    pub fn add_out_port<T: PortVal>(&mut self, name: &str) -> OutPort<T> {
         self.component.add_out_port::<T>(name)
     }
 
     /// Adds a new component to the coupled model.
+    ///
     /// If there is already a component with the same name as the new component, it panics.
     pub fn add_component<T: Simulator>(&mut self, component: Box<T>) {
         let component_name = component.get_name();
@@ -104,6 +109,7 @@ impl Coupled {
     }
 
     /// Returns a reference to a component with the provided name.
+    ///
     /// If the coupled model does not contain any model with that name, it returns [`None`].
     #[inline]
     fn get_component(&self, name: &str) -> Option<&Component> {
@@ -112,14 +118,19 @@ impl Coupled {
     }
 
     /// Adds a new EIC to the model.
+    ///
     /// You must provide the input port name of the coupled model,
     /// the receiving component name, and its input port name.
+    ///
+    /// # Panics
+    ///
     /// This method panics if:
-    /// - the origin port does not exist.
-    /// - the destination component does not exist.
-    /// - the destination port does not exist.
-    /// - ports are not compatible.
-    /// - coupling already exists.
+    ///
+    /// - The origin port does not exist.
+    /// - The destination component does not exist.
+    /// - The destination port does not exist.
+    /// - Ports are not compatible.
+    /// - Coupling already exists.
     pub fn add_eic(&mut self, port_from: &str, component_to: &str, port_to: &str) {
         let p_from = self
             .component
@@ -145,15 +156,20 @@ impl Coupled {
     }
 
     /// Adds a new IC to the model.
+    ///
     /// You must provide the sending component name, its output port name,
     /// the receiving component name, and its input port name.
+    ///
+    /// # Panics
+    ///
     /// This method panics if:
-    /// - the origin component does not exist.
-    /// - the origin port does not exist.
-    /// - the destination component does not exist.
-    /// - the destination port does not exist.
-    /// - ports are not compatible.
-    /// - coupling already exists.
+    ///
+    /// - The origin component does not exist.
+    /// - The origin port does not exist.
+    /// - The destination component does not exist.
+    /// - The destination port does not exist.
+    /// - Ports are not compatible.
+    /// - Coupling already exists.
     pub fn add_ic(
         &mut self,
         component_from: &str,
@@ -187,14 +203,19 @@ impl Coupled {
     }
 
     /// Adds a new EOC to the model.
+    ///
     /// You must provide the sending component name, its output port name,
     /// and the output port name of the coupled model.
+    ///
+    /// # Panics
+    ///
     /// This method panics if:
-    /// - the origin component does not exist.
-    /// - the origin port does not exist.
-    /// - the destination port does not exist.
-    /// - ports are not compatible.
-    /// - coupling already exists.
+    ///
+    /// - The origin component does not exist.
+    /// - The origin port does not exist.
+    /// - The destination port does not exist.
+    /// - Ports are not compatible.
+    /// - Coupling already exists.
     pub fn add_eoc(&mut self, component_from: &str, port_from: &str, port_to: &str) {
         let comp_from = self
             .get_component(component_from)
